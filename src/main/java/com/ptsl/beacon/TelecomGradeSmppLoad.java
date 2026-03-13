@@ -64,8 +64,8 @@ public class TelecomGradeSmppLoad {
     public static void main(String[] args) throws Exception {
 
         printConfig();
-        ExecutorService smppExecutor =
-                Executors.newFixedThreadPool(SESSIONS);
+
+        ExecutorService smppExecutor = Executors.newCachedThreadPool();
 
         DefaultSmppClient client =
                 new DefaultSmppClient(smppExecutor, SESSIONS);
