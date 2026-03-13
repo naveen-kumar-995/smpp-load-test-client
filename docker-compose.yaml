@@ -22,9 +22,9 @@ services:
       SMSC_PASSWORD: "pass123"
 
       # Load Test Configuration
-      SESSIONS: "20"
-      WINDOW_SIZE: "1000"
-      WORKER_THREADS: "200"
+      SESSIONS: "1"
+      WINDOW_SIZE: "100"
+      WORKER_THREADS: "20"
 
       # JVM tuning
       JAVA_TOOL_OPTIONS: >
