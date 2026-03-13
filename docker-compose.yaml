@@ -25,6 +25,7 @@ services:
       SESSIONS: "1"
       WINDOW_SIZE: "100"
       WORKER_THREADS: "20"
+      QUEUE_SIZE: "100000"
 
       # JVM tuning
       JAVA_TOOL_OPTIONS: >

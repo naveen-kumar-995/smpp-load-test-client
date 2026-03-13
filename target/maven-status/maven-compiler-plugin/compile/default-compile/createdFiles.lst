@@ -1,7 +1,8 @@
-com\ptsl\beacon\SmppMaxLoadClient$LoadSessionHandler.class
 com\ptsl\beacon\SmppClientTest$ClientSessionHandler.class
 com\ptsl\beacon\SmppClientTest$SmppSessionRunner.class
 com\ptsl\beacon\SmppClientTest.class
+com\ptsl\beacon\Handler.class
+com\ptsl\beacon\TelecomGradeSmppLoad$Handler.class
 com\ptsl\beacon\StartApplication.class
-com\ptsl\beacon\SmppMaxLoadClient.class
 com\ptsl\beacon\SmppClientTest$1.class
+com\ptsl\beacon\TelecomGradeSmppLoad.class
