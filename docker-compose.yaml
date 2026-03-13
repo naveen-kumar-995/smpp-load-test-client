@@ -1,0 +1,51 @@
+version: "3.8"
+
+services:
+
+  smpp-load-test-client:
+
+    container_name: smpp-load-test-client
+
+    build:
+      context: .
+      dockerfile: Dockerfile
+      no_cache: true
+
+    restart: "no"
+
+    environment:
+      TZ: "Asia/Kolkata"
+
+      # SMPP Connection
+      SMSC_HOST: "172.25.4.191"
+      SMSC_PORT: "2775"
+      SMSC_SYSTEM_ID: "naveen_test_01"
+      SMSC_PASSWORD: "pass123"
+
+      # Load Test Configuration
+      SESSIONS: "20"
+      WINDOW_SIZE: "1000"
+      WORKER_THREADS: "200"
+
+      # JVM tuning
+      JAVA_TOOL_OPTIONS: >
+        -Xms2g
+        -Xmx2g
+        -XX:+UseG1GC
+        -XX:+AlwaysPreTouch
+
+    volumes:
+      - ./logs:/logs
+
+    networks:
+      - smpp-test-net
+
+    deploy:
+      resources:
+        limits:
+          cpus: "4"
+          memory: 4G
+
+networks:
+  smpp-test-net:
+    driver: bridge
