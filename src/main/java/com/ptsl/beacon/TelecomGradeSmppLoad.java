@@ -82,7 +82,11 @@ public class TelecomGradeSmppLoad {
             cfg.setPort(PORT);
             cfg.setSystemId(SYSTEM_ID);
             cfg.setPassword(PASSWORD);
+
             cfg.setWindowSize(WINDOW);
+            cfg.setConnectTimeout(10000);
+            cfg.setRequestExpiryTimeout(30000);
+            cfg.setWindowMonitorInterval(15000);
 
             sessions[i] = client.bind(cfg,new Handler());
         }
@@ -138,13 +142,6 @@ public class TelecomGradeSmppLoad {
                         if(session==null || !session.isBound())
                             continue;
 
-                        if(session.getSendWindow().getFreeSize()==0){
-
-                            queue.offer(payload);
-                            Thread.sleep(1);
-                            continue;
-                        }
-
                         SubmitSm sm = new SubmitSm();
 
                         sm.setSourceAddress(
@@ -154,10 +151,16 @@ public class TelecomGradeSmppLoad {
                                 new Address((byte)1,(byte)1,"917550232158"));
 
                         sm.setShortMessage(payload);
+                        sm.setDataCoding((byte)0);
 
-                        session.sendRequestPdu(sm,10000,false);
+                        SubmitSmResp resp = session.submit(sm,10000);
 
                         sent.incrementAndGet();
+
+                        if(resp.getCommandStatus()==0)
+                            success.incrementAndGet();
+                        else
+                            failed.incrementAndGet();
 
                     }
                     catch(Exception e){
@@ -223,6 +226,12 @@ public class TelecomGradeSmppLoad {
             else
                 failed.incrementAndGet();
         }
+
+        @Override
+        public void fireChannelUnexpectedlyClosed() {
+
+            System.out.println("Session closed unexpectedly");
+        }
     }
 
     private static String getEnv(String key, String defaultValue) {
@@ -244,5 +253,4 @@ public class TelecomGradeSmppLoad {
             return defaultValue;
         }
     }
-
 }
