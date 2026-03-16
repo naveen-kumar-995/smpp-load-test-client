@@ -64,7 +64,7 @@
         <appender-ref ref="ASYNC_KAFKA" />
     </logger>
 
-    <root level="debug">
+    <root level="error">
         <appender-ref ref="STDOUT" />
         <appender-ref ref="ASYNC_APP" />
         <appender-ref ref="ASYNC_ERROR" />
