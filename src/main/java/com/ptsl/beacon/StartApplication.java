@@ -14,7 +14,7 @@ public class StartApplication
         try
         {
             log.debug("Starting load test..");
-           TelecomGradeSmppLoad.main(args);
+           MultiPartLoadPush.main(args);
         } catch (Exception e) {
             log.error("Exception while starting the load test", e);
         }

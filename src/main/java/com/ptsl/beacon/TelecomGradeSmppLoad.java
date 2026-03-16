@@ -15,7 +15,7 @@ import org.slf4j.LoggerFactory;
 
 public class TelecomGradeSmppLoad {
 
-    private static final Logger log = LoggerFactory.getLogger(TelecomGradeSmppLoad.class);
+    private static final Logger log = LoggerFactory.getLogger(MultiPartLoadPush.class);
 
     private static final int SESSIONS =
             getIntEnv("SESSIONS", 10);

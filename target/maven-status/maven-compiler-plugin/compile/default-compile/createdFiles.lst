@@ -1,3 +1,4 @@
+com\ptsl\beacon\MultiPartLoadPush.class
 com\ptsl\beacon\SmppClientTest$ClientSessionHandler.class
 com\ptsl\beacon\SmppClientTest$SmppSessionRunner.class
 com\ptsl\beacon\SmppClientTest.class
@@ -6,3 +7,4 @@ com\ptsl\beacon\TelecomGradeSmppLoad$Handler.class
 com\ptsl\beacon\StartApplication.class
 com\ptsl\beacon\SmppClientTest$1.class
 com\ptsl\beacon\TelecomGradeSmppLoad.class
+com\ptsl\beacon\MultiPartLoadPush$Handler.class
