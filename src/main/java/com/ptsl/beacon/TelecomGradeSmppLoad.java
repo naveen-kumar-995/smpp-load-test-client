@@ -185,16 +185,35 @@ public class TelecomGradeSmppLoad {
         ScheduledExecutorService metrics =
                 Executors.newScheduledThreadPool(1);
 
+        final AtomicLong lastSent = new AtomicLong();
+        final AtomicLong lastSuccess = new AtomicLong();
+        final AtomicLong lastFailed = new AtomicLong();
+
         metrics.scheduleAtFixedRate(() -> {
 
-            long s = sent.getAndSet(0);
-            long ok = success.getAndSet(0);
-            long err = failed.getAndSet(0);
+            long currentSent = sent.get();
+            long currentSuccess = success.get();
+            long currentFailed = failed.get();
 
-            log.error("TPS={} success={} failed={} queue={}", s, ok, err, queue.size());
+            long sentDelta = currentSent - lastSent.getAndSet(currentSent);
+            long successDelta = currentSuccess - lastSuccess.getAndSet(currentSuccess);
+            long failedDelta = currentFailed - lastFailed.getAndSet(currentFailed);
+
+            long tps = sentDelta / 5;
+
+            log.error(
+                    "TPS={} sent={} success={} failed={} queue={} totalSent={}",
+                    tps,
+                    sentDelta,
+                    successDelta,
+                    failedDelta,
+                    queue.size(),
+                    currentSent
+                     );
 
         },5,5,TimeUnit.SECONDS);
     }
+
 
     static void startWatchdog(){
 
