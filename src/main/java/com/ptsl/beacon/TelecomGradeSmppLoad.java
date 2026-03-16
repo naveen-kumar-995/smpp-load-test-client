@@ -41,6 +41,9 @@ public class TelecomGradeSmppLoad {
     private static final String PASSWORD =
             getEnv("SMSC_PASSWORD", "test");
 
+    private static final long MAX_MESSAGES =
+            getLongEnv("MAX_MESSAGES", 1000000);
+
     private static BlockingQueue<byte[]> queue =
             new ArrayBlockingQueue<>(QUEUE_SIZE);
 
@@ -101,28 +104,34 @@ public class TelecomGradeSmppLoad {
         startGenerator();
         startSenders();
         startMetrics();
-        startWatchdog();
+//        startWatchdog();
     }
 
     static void startGenerator(){
 
-        new Thread(() -> {
+        Thread generator = new Thread(() -> {
 
             byte[] msg = CharsetUtil.encode(
-                    "LOADTEST",
+                    "LOADTESTSINGLEPARTMESSAGE",
                     CharsetUtil.CHARSET_GSM);
 
-            while(true){
+            while(sent.get() < MAX_MESSAGES){
 
                 try{
                     queue.put(msg);
                 }
                 catch(Exception ignored){}
-
             }
 
-        }).start();
+            log.error("Generator finished producing {} messages", MAX_MESSAGES);
+
+        });
+
+        generator.setName("message-generator");
+        generator.setDaemon(true);
+        generator.start();
     }
+
 
     static void startSenders(){
 
@@ -211,27 +220,35 @@ public class TelecomGradeSmppLoad {
                     currentSent
                      );
 
+            int bound=0;
+
+            for(SmppSession s : sessions) {
+                if (s != null && s.isBound()) {
+                    bound++;
+                }
+                log.error("Live sessions={}/{}", bound, SESSIONS);
+            }
         },5,5,TimeUnit.SECONDS);
     }
 
 
-    static void startWatchdog(){
-
-        ScheduledExecutorService wd =
-                Executors.newScheduledThreadPool(1);
-
-        wd.scheduleAtFixedRate(() -> {
-
-            int bound=0;
-
-            for(SmppSession s : sessions)
-                if(s!=null && s.isBound())
-                    bound++;
-
-            log.error("WATCHDOG sessions={}/{}", bound, SESSIONS);
-
-        },10,10,TimeUnit.SECONDS);
-    }
+//    static void startWatchdog(){
+//
+//        ScheduledExecutorService wd =
+//                Executors.newScheduledThreadPool(1);
+//
+//        wd.scheduleAtFixedRate(() -> {
+//
+//            int bound=0;
+//
+//            for(SmppSession s : sessions)
+//                if(s!=null && s.isBound())
+//                    bound++;
+//
+//            log.error("WATCHDOG sessions={}/{}", bound, SESSIONS);
+//
+//        },10,10,TimeUnit.SECONDS);
+//    }
 
     static class Handler extends DefaultSmppSessionHandler implements com.ptsl.beacon.Handler {
 
@@ -268,6 +285,15 @@ public class TelecomGradeSmppLoad {
 
         try {
             return Integer.parseInt(getEnv(key, String.valueOf(defaultValue)));
+        } catch (Exception e) {
+            return defaultValue;
+        }
+    }
+
+    private static long getLongEnv(String key, long defaultValue) {
+
+        try {
+            return Long.parseLong(getEnv(key, String.valueOf(defaultValue)));
         } catch (Exception e) {
             return defaultValue;
         }
