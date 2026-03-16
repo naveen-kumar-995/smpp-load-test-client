@@ -192,8 +192,11 @@ public class MultiPartLoadPush {
 
         sm.setSourceAddress(randomSource());
         sm.setDestAddress(randomDestination());
+
         sm.setDataCoding((byte)0);
-        sm.setRegisteredDelivery(SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
+
+        sm.setRegisteredDelivery(
+                SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
 
         try {
             sm.setShortMessage(payload);
@@ -201,12 +204,15 @@ public class MultiPartLoadPush {
             throw new RuntimeException(e);
         }
 
-        // DLT Parameters
+        // IMPORTANT: Enable UDH flag
+        sm.setEsmClass(SmppConstants.ESM_CLASS_UDHI_MASK);
+
         sm.addOptionalParameter(new Tlv((short)0x1400,"110100001403".getBytes()));
         sm.addOptionalParameter(new Tlv((short)0x1401,"1107174074670190034".getBytes()));
 
         return sm;
     }
+
 
     // -------------------------------------------------------
     // MULTIPART BUILDER
