@@ -10,7 +10,12 @@ import com.cloudhopper.commons.charset.CharsetUtil;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 public class TelecomGradeSmppLoad {
+
+    private static final Logger log = LoggerFactory.getLogger(TelecomGradeSmppLoad.class);
 
     private static final int SESSIONS =
             getIntEnv("SESSIONS", 10);
@@ -47,18 +52,18 @@ public class TelecomGradeSmppLoad {
 
     private static void printConfig() {
 
-        System.out.println("===== SMPP LOAD CONFIG =====");
+        log.error("===== SMPP LOAD CONFIG =====");
 
-        System.out.println("Host: " + HOST);
-        System.out.println("Port: " + PORT);
-        System.out.println("SystemId: " + SYSTEM_ID);
+        log.error("Host: {}", HOST);
+        log.error("Port: {}", PORT);
+        log.error("SystemId: {}", SYSTEM_ID);
 
-        System.out.println("Sessions: " + SESSIONS);
-        System.out.println("Window: " + WINDOW);
-        System.out.println("Workers: " + WORKERS);
-        System.out.println("Queue: " + QUEUE_SIZE);
+        log.error("Sessions: {}", SESSIONS);
+        log.error("Window: {}", WINDOW);
+        log.error("Workers: {}", WORKERS);
+        log.error("Queue: {}", QUEUE_SIZE);
 
-        System.out.println("============================");
+        log.error("============================");
     }
 
     public static void main(String[] args) throws Exception {
@@ -91,7 +96,7 @@ public class TelecomGradeSmppLoad {
             sessions[i] = client.bind(cfg,new Handler());
         }
 
-        System.out.println("Sessions connected: "+SESSIONS);
+        log.error("Sessions connected: {}", SESSIONS);
 
         startGenerator();
         startSenders();
@@ -186,11 +191,7 @@ public class TelecomGradeSmppLoad {
             long ok = success.getAndSet(0);
             long err = failed.getAndSet(0);
 
-            System.out.println(
-                    "TPS="+s+
-                            " success="+ok+
-                            " failed="+err+
-                            " queue="+queue.size());
+            log.error("TPS={} success={} failed={} queue={}", s, ok, err, queue.size());
 
         },5,5,TimeUnit.SECONDS);
     }
@@ -208,8 +209,7 @@ public class TelecomGradeSmppLoad {
                 if(s!=null && s.isBound())
                     bound++;
 
-            System.out.println(
-                    "WATCHDOG sessions="+bound+"/"+SESSIONS);
+            log.error("WATCHDOG sessions={}/{}", bound, SESSIONS);
 
         },10,10,TimeUnit.SECONDS);
     }
@@ -230,7 +230,7 @@ public class TelecomGradeSmppLoad {
         @Override
         public void fireChannelUnexpectedlyClosed() {
 
-            System.out.println("Session closed unexpectedly");
+            log.error("Session closed unexpectedly");
         }
     }
 
