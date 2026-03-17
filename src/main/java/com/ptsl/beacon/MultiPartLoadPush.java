@@ -12,9 +12,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.util.List;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 public class MultiPartLoadPush {
@@ -33,12 +33,12 @@ public class MultiPartLoadPush {
 
     private static final long MAX_MESSAGES = getLongEnv("MAX_MESSAGES", 1000000);
 
-    private static final Address SRC_ADDR = new Address((byte)1,(byte)1,"CANBNK");
-    private static final Address DST_ADDR = new Address((byte)1,(byte)1,"917550232158");
+    private static final AtomicInteger REF_GEN = new AtomicInteger(0);
+
+    private static final BlockingQueue<SmsFragment> queue =
+            new ArrayBlockingQueue<>(QUEUE_SIZE);
+
     private static final AtomicLong produced = new AtomicLong();
-
-    private static final BlockingQueue<byte[]> queue = new ArrayBlockingQueue<>(QUEUE_SIZE);
-
     private static final AtomicLong sent = new AtomicLong();
     private static final AtomicLong success = new AtomicLong();
     private static final AtomicLong failed = new AtomicLong();
@@ -47,18 +47,18 @@ public class MultiPartLoadPush {
 
     public static void main(String[] args) throws Exception {
 
-        printConfig();
+        log.error("Starting SMPP Load Generator");
 
         ExecutorService smppExecutor = Executors.newCachedThreadPool();
         DefaultSmppClient client = new DefaultSmppClient(smppExecutor, SESSIONS);
 
         sessions = new SmppSession[SESSIONS];
 
-        for(int i=0;i<SESSIONS;i++){
+        for (int i = 0; i < SESSIONS; i++) {
 
             SmppSessionConfiguration cfg = new SmppSessionConfiguration();
 
-            cfg.setName("session-"+i);
+            cfg.setName("session-" + i);
             cfg.setType(SmppBindType.TRANSCEIVER);
             cfg.setHost(HOST);
             cfg.setPort(PORT);
@@ -66,32 +66,17 @@ public class MultiPartLoadPush {
             cfg.setPassword(PASSWORD);
             cfg.setWindowSize(WINDOW);
 
-            sessions[i] = client.bind(cfg,new Handler());
+            sessions[i] = client.bind(cfg, new Handler());
         }
 
-        log.info("Connected SMPP sessions {}", SESSIONS);
+        log.error("Connected {} sessions", SESSIONS);
 
         startGenerator();
         startSenders();
         startMetrics();
     }
 
-    private static void printConfig(){
-
-        log.error("====== SMPP LOAD CONFIG ======");
-        log.error("Host {}",HOST);
-        log.error("Port {}",PORT);
-        log.error("Sessions {}",SESSIONS);
-        log.error("Workers {}",WORKERS);
-        log.error("Window {}",WINDOW);
-        log.error("===============================");
-    }
-
-    // -------------------------------------------------------
-    // MESSAGE GENERATOR
-    // -------------------------------------------------------
-
-    static void startGenerator(){
+    static void startGenerator() {
 
         Thread generator = new Thread(() -> {
 
@@ -100,81 +85,66 @@ public class MultiPartLoadPush {
                             + "fvg Benf {#var#}, IFSC {#var#}, Benf A/c {#var#}, UTR {#var#}. "
                             + "Total Avail. Bal INR {#var#} -Canara Bank";
 
-            List<byte[]> parts = buildMultipart(message,false);
+            while (produced.get() < MAX_MESSAGES) {
 
-            while(true){
+                List<SmsFragment> parts = buildMultipart(message);
 
-                long current = produced.get();
-
-                if(current >= MAX_MESSAGES){
-                    break;
-                }
-
-                for(byte[] p : parts){
+                for (SmsFragment part : parts) {
 
                     long next = produced.incrementAndGet();
 
-                    if(next > MAX_MESSAGES){
+                    if (next > MAX_MESSAGES)
                         return;
-                    }
 
-                    try{
-                        queue.put(p);
-                    }catch(Exception ignored){}
+                    try {
+                        queue.put(part);
+                    } catch (Exception ignored) {}
                 }
             }
 
-            log.error("Generator finished producing {} PDUs", MAX_MESSAGES);
-
+            log.error("Generator finished");
         });
 
         generator.setDaemon(true);
         generator.start();
     }
 
-
-    // -------------------------------------------------------
-    // SENDERS
-    // -------------------------------------------------------
-
-    static void startSenders(){
+    static void startSenders() {
 
         ExecutorService workers =
                 Executors.newThreadPerTaskExecutor(Thread.ofVirtual().factory());
 
-        for(int i=0;i<WORKERS;i++){
+        for (int i = 0; i < WORKERS; i++) {
 
             workers.submit(() -> {
 
-                int index=0;
+                int index = 0;
 
-                while(true){
+                while (true) {
 
-                    try{
+                    try {
 
-                        byte[] payload = queue.take();
+                        SmsFragment fragment = queue.take();
 
                         SmppSession session = sessions[index];
-
                         index++;
-                        if(index==SESSIONS) index=0;
+                        if (index == SESSIONS) index = 0;
 
-                        if(session==null || !session.isBound())
+                        if (session == null || !session.isBound())
                             continue;
 
-                        SubmitSm sm = createSubmitSm(payload);
+                        SubmitSm sm = createSubmitSm(fragment);
 
-                        SubmitSmResp resp = session.submit(sm,10000);
+                        SubmitSmResp resp = session.submit(sm, 10000);
 
                         sent.incrementAndGet();
 
-                        if(resp.getCommandStatus()==0)
+                        if (resp.getCommandStatus() == 0)
                             success.incrementAndGet();
                         else
                             failed.incrementAndGet();
 
-                    }catch(Exception e){
-
+                    } catch (Exception e) {
                         failed.incrementAndGet();
                     }
                 }
@@ -182,100 +152,77 @@ public class MultiPartLoadPush {
         }
     }
 
-    // -------------------------------------------------------
-    // SUBMITSM BUILDER
-    // -------------------------------------------------------
-
-    private static SubmitSm createSubmitSm(byte[] payload){
+    private static SubmitSm createSubmitSm(SmsFragment fragment) {
 
         SubmitSm sm = new SubmitSm();
 
         sm.setSourceAddress(randomSource());
         sm.setDestAddress(randomDestination());
 
-        sm.setDataCoding((byte)0);
-
+        sm.setDataCoding((byte) 0);
         sm.setRegisteredDelivery(
                 SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
 
+        if (fragment.hasUdh)
+            sm.setEsmClass(SmppConstants.ESM_CLASS_UDHI_MASK);
+
         try {
-            sm.setShortMessage(payload);
+            sm.setShortMessage(fragment.payload);
         } catch (SmppInvalidArgumentException e) {
             throw new RuntimeException(e);
         }
 
-        // IMPORTANT: Enable UDH flag
-        sm.setEsmClass(SmppConstants.ESM_CLASS_UDHI_MASK);
-
-        sm.addOptionalParameter(new Tlv((short)0x1400,"110100001403".getBytes()));
-        sm.addOptionalParameter(new Tlv((short)0x1401,"1107174074670190034".getBytes()));
+        sm.addOptionalParameter(new Tlv((short) 0x1400, "110100001403".getBytes()));
+        sm.addOptionalParameter(new Tlv((short) 0x1401, "1107174074670190034".getBytes()));
 
         return sm;
     }
 
+    static List<SmsFragment> buildMultipart(String message) {
 
-    // -------------------------------------------------------
-    // MULTIPART BUILDER
-    // -------------------------------------------------------
+        List<SmsFragment> parts = new ArrayList<>();
 
-    private static List<byte[]> buildMultipart(String message, boolean unicode){
+        byte[] msgBytes = CharsetUtil.encode(message, CharsetUtil.CHARSET_GSM);
 
-        List<byte[]> parts = new ArrayList<>();
+        int multiLimit = 153;
 
-        byte[] msgBytes = CharsetUtil.encode(
-                message,
-                unicode ? CharsetUtil.CHARSET_UCS_2 : CharsetUtil.CHARSET_GSM);
+        int totalParts = (int) Math.ceil((double) msgBytes.length / multiLimit);
 
-        int singleLimit = unicode ? 140 : 160;
-        int multiLimit = unicode ? 134 : 153;
+        int ref = REF_GEN.incrementAndGet() & 0xff;
 
-        if(msgBytes.length <= singleLimit){
+        for (int part = 1; part <= totalParts; part++) {
 
-            parts.add(msgBytes);
-            return parts;
-        }
-
-        int totalParts = (int)Math.ceil((double)msgBytes.length / multiLimit);
-
-        int ref = (int)(System.nanoTime() & 0xff);
-
-        for(int part=1; part<=totalParts; part++){
-
-            int start = (part-1) * multiLimit;
-            int len = Math.min(multiLimit,msgBytes.length-start);
+            int start = (part - 1) * multiLimit;
+            int len = Math.min(multiLimit, msgBytes.length - start);
 
             byte[] body = new byte[len];
-            System.arraycopy(msgBytes,start,body,0,len);
+            System.arraycopy(msgBytes, start, body, 0, len);
 
-            byte[] udh = createUdh(ref,totalParts,part);
+            byte[] udh = createUdh(ref, totalParts, part);
 
             ByteBuffer buf = ByteBuffer.allocate(udh.length + body.length);
             buf.put(udh);
             buf.put(body);
 
-            parts.add(buf.array());
+            parts.add(new SmsFragment(buf.array(), true));
         }
 
         return parts;
     }
 
-    private static byte[] createUdh(int ref,int total,int seq){
+    private static byte[] createUdh(int ref, int total, int seq) {
 
         return new byte[]{
                 0x05,
                 0x00,
                 0x03,
-                (byte)ref,
-                (byte)total,
-                (byte)seq
+                (byte) ref,
+                (byte) total,
+                (byte) seq
         };
     }
 
-    // -------------------------------------------------------
-    // METRICS
-    // -------------------------------------------------------
-
-    static void startMetrics(){
+    static void startMetrics() {
 
         ScheduledExecutorService metrics =
                 Executors.newScheduledThreadPool(1);
@@ -287,48 +234,33 @@ public class MultiPartLoadPush {
             long current = sent.get();
             long delta = current - lastSent.getAndSet(current);
 
-            long tps = delta / 5;
-
             log.error(
                     "TPS={} sent={} success={} failed={} queue={}",
-                    tps,
+                    delta / 5,
                     delta,
                     success.get(),
                     failed.get(),
-                    queue.size()
-                    );
+                    queue.size());
 
-        },5,5,TimeUnit.SECONDS);
+        }, 5, 5, TimeUnit.SECONDS);
     }
 
-    // -------------------------------------------------------
-    // SESSION HANDLER
-    // -------------------------------------------------------
+    static class SmsFragment {
+
+        byte[] payload;
+        boolean hasUdh;
+
+        SmsFragment(byte[] payload, boolean hasUdh) {
+            this.payload = payload;
+            this.hasUdh = hasUdh;
+        }
+    }
 
     static class Handler extends DefaultSmppSessionHandler {
 
         @Override
-        public void fireChannelUnexpectedlyClosed(){
+        public void fireChannelUnexpectedlyClosed() {
             log.error("SMPP session closed");
-        }
-    }
-
-    // -------------------------------------------------------
-    // ENV HELPERS
-    // -------------------------------------------------------
-
-    private static String getEnv(String key,String def){
-
-        String v = System.getenv(key);
-        return (v==null||v.isBlank()) ? def : v.trim();
-    }
-
-    private static int getIntEnv(String key,int def){
-
-        try{
-            return Integer.parseInt(getEnv(key,String.valueOf(def)));
-        }catch(Exception e){
-            return def;
         }
     }
 
@@ -338,7 +270,7 @@ public class MultiPartLoadPush {
                 910000000000L +
                         ThreadLocalRandom.current().nextLong(999999999L);
 
-        return new Address((byte)1,(byte)1,String.valueOf(number));
+        return new Address((byte) 1, (byte) 1, String.valueOf(number));
     }
 
     private static final String[] HEADERS = {
@@ -349,16 +281,25 @@ public class MultiPartLoadPush {
     private static Address randomSource() {
 
         String header = HEADERS[
-                ThreadLocalRandom.current().nextInt(HEADERS.length)
-                ];
+                ThreadLocalRandom.current().nextInt(HEADERS.length)];
 
-        return new Address((byte)1,(byte)1,header);
+        return new Address((byte) 1, (byte) 1, header);
     }
 
+    private static String getEnv(String key,String def){
+        String v = System.getenv(key);
+        return (v==null||v.isBlank()) ? def : v.trim();
+    }
 
+    private static int getIntEnv(String key,int def){
+        try{
+            return Integer.parseInt(getEnv(key,String.valueOf(def)));
+        }catch(Exception e){
+            return def;
+        }
+    }
 
     private static long getLongEnv(String key,long def){
-
         try{
             return Long.parseLong(getEnv(key,String.valueOf(def)));
         }catch(Exception e){
