@@ -1,9 +1,7 @@
 version: "3.8"
 
 services:
-
   smpp-load-test-client:
-
     container_name: smpp-load-test-client
 
     build:
@@ -15,30 +13,69 @@ services:
     environment:
       TZ: "Asia/Kolkata"
 
+      # --------------------------------------------------
       # SMPP Connection
+      # --------------------------------------------------
       SMSC_HOST: "172.25.4.191"
       SMSC_PORT: "2775"
       SMSC_SYSTEM_ID: "naveen_test_01"
       SMSC_PASSWORD: "pass123"
 
-      # Load Test Configuration
+      # --------------------------------------------------
+      # Load Generator Configuration
+      # --------------------------------------------------
       SESSIONS: "1"
       WINDOW_SIZE: "100"
       WORKER_THREADS: "20"
       QUEUE_SIZE: "100000"
+      MAX_MESSAGES: "1000000"
 
-      # JVM tuning
-      JAVA_TOOL_OPTIONS: >
+      # MESSAGE_MODE:
+      #   single     -> only single-part messages
+      #   multipart  -> only multipart messages
+      #   mixed      -> single + multipart mix
+      MESSAGE_MODE: "single"
+
+      # Used only when MESSAGE_MODE=mixed
+      # Example: 30 means 30% single-part, 70% multipart
+      SINGLE_PERCENT: "30"
+
+      # false -> GSM 7-bit
+      # true  -> UCS2 / Unicode
+      UNICODE: "false"
+
+      # --------------------------------------------------
+      # Message Templates
+      # --------------------------------------------------
+      SINGLE_MESSAGE: "Canara Bank alert: INR 1000 credited to your account. Ref {#var#}"
+
+      MULTIPART_MESSAGE: >-
+        An amount of {#var#} has been debited to {#var#} on {#var#} towards {#var#}
+        fvg Benf {#var#}, IFSC {#var#}, Benf A/c {#var#}, UTR {#var#}.
+        Total Avail. Bal INR {#var#} -Canara Bank
+
+      # --------------------------------------------------
+      # JVM Tuning
+      # --------------------------------------------------
+      JAVA_TOOL_OPTIONS: >-
         -Xms2g
         -Xmx2g
         -XX:+UseG1GC
         -XX:+AlwaysPreTouch
+        -XX:MaxGCPauseMillis=200
+        -XX:+HeapDumpOnOutOfMemoryError
+        -XX:HeapDumpPath=/logs
 
     volumes:
       - ./logs:/logs
 
     networks:
       - smpp-test-net
+
+    # compose 'deploy' limits are ignored by normal docker compose,
+    # so keep mem_limit/cpus also for local compose usage
+#    mem_limit: 4g
+#    cpus: 4.0
 
     deploy:
       resources:
