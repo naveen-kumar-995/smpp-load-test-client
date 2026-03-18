@@ -8,6 +8,7 @@ import com.cloudhopper.smpp.pdu.*;
 import com.cloudhopper.smpp.tlv.Tlv;
 import com.cloudhopper.smpp.type.Address;
 import com.cloudhopper.smpp.type.SmppInvalidArgumentException;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,10 +34,10 @@ public class MultiPartLoadPush {
 
     private static final long MAX_MESSAGES = getLongEnv("MAX_MESSAGES", 1000000);
 
-    private static final AtomicInteger REF_GEN = new AtomicInteger(0);
-
     private static final BlockingQueue<SmsFragment> queue =
             new ArrayBlockingQueue<>(QUEUE_SIZE);
+
+    private static final AtomicInteger REF_GEN = new AtomicInteger();
 
     private static final AtomicLong produced = new AtomicLong();
     private static final AtomicLong sent = new AtomicLong();
@@ -47,7 +48,7 @@ public class MultiPartLoadPush {
 
     public static void main(String[] args) throws Exception {
 
-        log.error("Starting SMPP Load Generator");
+        log.error("Starting SMPP Multipart Load Generator");
 
         ExecutorService smppExecutor = Executors.newCachedThreadPool();
         DefaultSmppClient client = new DefaultSmppClient(smppExecutor, SESSIONS);
@@ -57,7 +58,6 @@ public class MultiPartLoadPush {
         for (int i = 0; i < SESSIONS; i++) {
 
             SmppSessionConfiguration cfg = new SmppSessionConfiguration();
-
             cfg.setName("session-" + i);
             cfg.setType(SmppBindType.TRANSCEIVER);
             cfg.setHost(HOST);
@@ -76,6 +76,10 @@ public class MultiPartLoadPush {
         startMetrics();
     }
 
+    // --------------------------------------------------------
+    // MESSAGE GENERATOR
+    // --------------------------------------------------------
+
     static void startGenerator() {
 
         Thread generator = new Thread(() -> {
@@ -87,9 +91,15 @@ public class MultiPartLoadPush {
 
             while (produced.get() < MAX_MESSAGES) {
 
-                List<SmsFragment> parts = buildMultipart(message);
+                Address src = randomSource();
+                Address dst = randomDestination();
 
-                for (SmsFragment part : parts) {
+                int ref = REF_GEN.incrementAndGet() & 0xffff;
+
+                List<SmsFragment> fragments =
+                        buildMultipart(message, src, dst, ref);
+
+                for (SmsFragment fragment : fragments) {
 
                     long next = produced.incrementAndGet();
 
@@ -97,17 +107,21 @@ public class MultiPartLoadPush {
                         return;
 
                     try {
-                        queue.put(part);
+                        queue.put(fragment);
                     } catch (Exception ignored) {}
                 }
             }
 
-            log.error("Generator finished");
+            log.error("Generator finished producing messages");
         });
 
         generator.setDaemon(true);
         generator.start();
     }
+
+    // --------------------------------------------------------
+    // SENDERS
+    // --------------------------------------------------------
 
     static void startSenders() {
 
@@ -118,7 +132,7 @@ public class MultiPartLoadPush {
 
             workers.submit(() -> {
 
-                int index = 0;
+                int sessionIndex = 0;
 
                 while (true) {
 
@@ -126,9 +140,11 @@ public class MultiPartLoadPush {
 
                         SmsFragment fragment = queue.take();
 
-                        SmppSession session = sessions[index];
-                        index++;
-                        if (index == SESSIONS) index = 0;
+                        SmppSession session = sessions[sessionIndex];
+
+                        sessionIndex++;
+                        if (sessionIndex == SESSIONS)
+                            sessionIndex = 0;
 
                         if (session == null || !session.isBound())
                             continue;
@@ -152,14 +168,19 @@ public class MultiPartLoadPush {
         }
     }
 
+    // --------------------------------------------------------
+    // SUBMITSM BUILDER
+    // --------------------------------------------------------
+
     private static SubmitSm createSubmitSm(SmsFragment fragment) {
 
         SubmitSm sm = new SubmitSm();
 
-        sm.setSourceAddress(randomSource());
-        sm.setDestAddress(randomDestination());
+        sm.setSourceAddress(fragment.source);
+        sm.setDestAddress(fragment.destination);
 
         sm.setDataCoding((byte) 0);
+
         sm.setRegisteredDelivery(
                 SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
 
@@ -178,17 +199,25 @@ public class MultiPartLoadPush {
         return sm;
     }
 
-    static List<SmsFragment> buildMultipart(String message) {
+    // --------------------------------------------------------
+    // MULTIPART BUILDER
+    // --------------------------------------------------------
+
+    static List<SmsFragment> buildMultipart(
+            String message,
+            Address source,
+            Address destination,
+            int ref) {
 
         List<SmsFragment> parts = new ArrayList<>();
 
-        byte[] msgBytes = CharsetUtil.encode(message, CharsetUtil.CHARSET_GSM);
+        byte[] msgBytes =
+                CharsetUtil.encode(message, CharsetUtil.CHARSET_GSM);
 
         int multiLimit = 153;
 
-        int totalParts = (int) Math.ceil((double) msgBytes.length / multiLimit);
-
-        int ref = REF_GEN.incrementAndGet() & 0xff;
+        int totalParts =
+                (int) Math.ceil((double) msgBytes.length / multiLimit);
 
         for (int part = 1; part <= totalParts; part++) {
 
@@ -200,11 +229,17 @@ public class MultiPartLoadPush {
 
             byte[] udh = createUdh(ref, totalParts, part);
 
-            ByteBuffer buf = ByteBuffer.allocate(udh.length + body.length);
-            buf.put(udh);
-            buf.put(body);
+            ByteBuffer buffer =
+                    ByteBuffer.allocate(udh.length + body.length);
 
-            parts.add(new SmsFragment(buf.array(), true));
+            buffer.put(udh);
+            buffer.put(body);
+
+            parts.add(new SmsFragment(
+                    buffer.array(),
+                    true,
+                    source,
+                    destination));
         }
 
         return parts;
@@ -222,12 +257,16 @@ public class MultiPartLoadPush {
         };
     }
 
+    // --------------------------------------------------------
+    // METRICS
+    // --------------------------------------------------------
+
     static void startMetrics() {
 
         ScheduledExecutorService metrics =
                 Executors.newScheduledThreadPool(1);
 
-        final AtomicLong lastSent = new AtomicLong();
+        AtomicLong lastSent = new AtomicLong();
 
         metrics.scheduleAtFixedRate(() -> {
 
@@ -245,16 +284,33 @@ public class MultiPartLoadPush {
         }, 5, 5, TimeUnit.SECONDS);
     }
 
+    // --------------------------------------------------------
+    // DATA MODEL
+    // --------------------------------------------------------
+
     static class SmsFragment {
 
         byte[] payload;
         boolean hasUdh;
+        Address source;
+        Address destination;
 
-        SmsFragment(byte[] payload, boolean hasUdh) {
+        SmsFragment(
+                byte[] payload,
+                boolean hasUdh,
+                Address source,
+                Address destination) {
+
             this.payload = payload;
             this.hasUdh = hasUdh;
+            this.source = source;
+            this.destination = destination;
         }
     }
+
+    // --------------------------------------------------------
+    // SESSION HANDLER
+    // --------------------------------------------------------
 
     static class Handler extends DefaultSmppSessionHandler {
 
@@ -263,6 +319,10 @@ public class MultiPartLoadPush {
             log.error("SMPP session closed");
         }
     }
+
+    // --------------------------------------------------------
+    // RANDOM ADDRESS GENERATORS
+    // --------------------------------------------------------
 
     private static Address randomDestination() {
 
@@ -280,11 +340,15 @@ public class MultiPartLoadPush {
 
     private static Address randomSource() {
 
-        String header = HEADERS[
-                ThreadLocalRandom.current().nextInt(HEADERS.length)];
+        String header =
+                HEADERS[ThreadLocalRandom.current().nextInt(HEADERS.length)];
 
         return new Address((byte) 1, (byte) 1, header);
     }
+
+    // --------------------------------------------------------
+    // ENV HELPERS
+    // --------------------------------------------------------
 
     private static String getEnv(String key,String def){
         String v = System.getenv(key);
