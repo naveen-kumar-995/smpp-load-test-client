@@ -13,8 +13,9 @@ public class StartApplication
 
         try
         {
-            log.debug("Starting load test..");
-           MultiPartLoadPush.main(args);
+            log.debug("Starting DLR load test..");
+//           MultiPartLoadPush.main(args);
+            DlrLoadTest.main(args);
         } catch (Exception e) {
             log.error("Exception while starting the load test", e);
         }

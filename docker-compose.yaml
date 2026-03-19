@@ -30,6 +30,10 @@ services:
       QUEUE_SIZE: "100000"
       MAX_MESSAGES: "1000000"
 
+      dlr_url: "http://172.25.4.191:8080/dlr"
+      dlr_concurrency: "180"
+      dlr_duration_sec: "300"
+
       # MESSAGE_MODE:
       #   single     -> only single-part messages
       #   multipart  -> only multipart messages
