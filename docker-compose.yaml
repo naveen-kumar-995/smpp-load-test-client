@@ -25,8 +25,8 @@ services:
       # Load Generator Configuration
       # --------------------------------------------------
       SESSIONS: "1"
-      WINDOW_SIZE: "100"
-      WORKER_THREADS: "20"
+      WINDOW_SIZE: "10"
+      WORKER_THREADS: "1"
       QUEUE_SIZE: "100000"
       MAX_MESSAGES: "1000000"
 

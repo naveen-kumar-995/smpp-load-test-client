@@ -30,13 +30,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class SmppClientTest {
 
     // --- Configuration Constants ---
-    private static final int NUMBER_OF_SESSIONS = 1;
+    private static final int NUMBER_OF_SESSIONS = 10;
     private static final int MESSAGES_PER_SESSION = 1;
-    private static final boolean SEND_MULTIPART = true;
+    private static final boolean SEND_MULTIPART = false;
     private static final String SMSC_HOST = "172.25.4.191";
     private static final int SMSC_PORT = 2775;
     private static final String SYSTEM_ID = "naveen_test_01";
     private static final String PASSWORD = "pass123";
+
 
 
     public static void main(String[] args) throws Exception {
@@ -185,10 +186,11 @@ public class SmppClientTest {
                 msgTxt   = "जन्मदिन की हार्दिक शुभकामनाएं केनरा बैंक Happy Birthday Canara Bank";
             }else {
                 msgTxt = "Thanks for showing interest on CANARA BUDGET LOAN of Canara Bank. Your Regenerated MPIN is !@#$%^&*().Pls enter the same to continue the online application.";
+//                msgTxt = "An amount of !^$^$@ has been debited to 1%#%%# on 12345 towards 12345 fvg Benf 12345, IFSC 12345, Benf A/c 12345, UTR 12345. Total Avail. Bal INR 12345 -Canara Bank";
             }
             byte[] textBytes = CharsetUtil.encode(msgTxt, isUnicode ? CharsetUtil.CHARSET_UCS_2 : CharsetUtil.CHARSET_GSM);
 
-            SubmitSm submitSm = createSubmitSm(isUnicode, false, textBytes);
+            SubmitSm submitSm = createSubmitSm(isUnicode, false, true,false ,  textBytes);
             submitAndWait(session, submitSm, String.format("Single Part (%s)", isUnicode ? "Unicode" : "Plain"));
         }
 
@@ -210,7 +212,7 @@ public class SmppClientTest {
 //            sendAutoMultipart(session, 50 + refNumStart, longMessage, false);
 
             String unicodelong = "மார்ச் 4 2025 வருகின்ற செவ்வாய் கிழமை அன்று ங்கரன்கோவில் நீதிமன்ற கட்டிட வளாகத்தில் நடைபெறவுள்ள லோக் அதாலத் தற்போது உள்ளூர் விடுமுறை காரணத்தினால் 03.03.2025 திங்கள் கிழமை அன்று மாற்றப்பட்டுள்ளது என்பதை தெரிவித்துக் கொள்கிறோம். கனரா வங்கி மண்டல அலுவலகம் தூத்துக்குடி";
-            sendAutoMultipart(session, 60 + refNumStart, unicodelong, true);
+            sendAutoMultipart(session, 60 + refNumStart, longMessage, false);
 
             // SCENARIO 6: Auto-Splitting Full Text (Unicode)
 //            log("--- SCENARIO 6: Auto-Splitting Long Message - Unicode ---");
@@ -232,7 +234,7 @@ public class SmppClientTest {
                 ByteBuffer buffer = ByteBuffer.allocate(udh.length + textBytes.length);
                 buffer.put(udh).put(textBytes);
 
-                SubmitSm submitSm = createSubmitSm(isUnicode, true, buffer.array());
+                SubmitSm submitSm = createSubmitSm(isUnicode, true, false, false,  buffer.array());
                 submitAndWait(session, submitSm, String.format("Part %d/%d (Ref %d, %s)", partNum, totalParts, refNum, isUnicode ? "Unicode" : "Plain"));
             }
         }
@@ -247,7 +249,7 @@ public class SmppClientTest {
                     : (int) Math.ceil((double) fullBytes.length / multipartChunkLimit);
 
             if (totalParts == 1) {
-                SubmitSm submitSm = createSubmitSm(isUnicode, false, fullBytes);
+                SubmitSm submitSm = createSubmitSm(isUnicode, false, false, false,  fullBytes);
                 submitAndWait(session, submitSm, String.format("Auto Single Part (Ref %d, %s)", refNum, isUnicode ? "Unicode" : "Plain"));
                 return;
             }
@@ -263,7 +265,7 @@ public class SmppClientTest {
                 ByteBuffer buffer = ByteBuffer.allocate(udh.length + textBytes.length);
                 buffer.put(udh).put(textBytes);
 
-                SubmitSm submitSm = createSubmitSm(isUnicode, true, buffer.array());
+                SubmitSm submitSm = createSubmitSm(isUnicode, true, false, true,   buffer.array());
                 submitAndWait(session, submitSm, String.format("Auto Part %d/%d (Ref %d, %s)", partNum, totalParts, refNum, isUnicode ? "Unicode" : "Plain"));
             }
         }
@@ -274,20 +276,62 @@ public class SmppClientTest {
             return new byte[] { 0x05, 0x00, 0x03, (byte)refNum, (byte)totalParts, (byte)partNum };
         }
 
-        private SubmitSm createSubmitSm(boolean isUnicode, boolean isMultipart, byte[] payload) throws Exception {
+
+        private SubmitSm createDynamicSubmitSm(boolean isUnicode, boolean isMultipart, boolean isFlash , boolean sendPayloadInTLV, String header, String dest, String peId, String templateId, byte[] payload) throws Exception {
             SubmitSm submitSm = new SubmitSm();
-            submitSm.setSourceAddress(new Address((byte)0x01, (byte)0x01, "CANBNK"));
-            submitSm.setDestAddress(new Address((byte)0x01, (byte)0x01, "917550232158"));
+            submitSm.setSourceAddress(new Address((byte)0x01, (byte)0x01, header));
+            submitSm.setDestAddress(new Address((byte)0x01, (byte)0x01, dest));
             submitSm.setRegisteredDelivery(SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
-            submitSm.setDataCoding(isUnicode ? (byte) 0x08 : (byte) 0x00);
+
+            byte dcs = isUnicode ? (byte) 0x08 : (byte) 0x00;
+            if (isFlash) {
+                dcs = isUnicode ? (byte) 0x18 : (byte) 0x10;
+            }
+            submitSm.setDataCoding(dcs);
 
             if (isMultipart) {
                 submitSm.setEsmClass(SmppConstants.ESM_CLASS_UDHI_MASK);
             }
-            submitSm.setShortMessage(payload);
+
+            if(sendPayloadInTLV) {
+                submitSm.addOptionalParameter(new Tlv(SmppConstants.TAG_MESSAGE_PAYLOAD, payload));
+            }else {
+                submitSm.setShortMessage(payload);
+            }
+
+            submitSm.addOptionalParameter(new Tlv((short) 0x1400, peId.getBytes())); // PE_ID
+            submitSm.addOptionalParameter(new Tlv((short) 0x1401, templateId.getBytes())); // TEMPLATE_ID
+            return submitSm;
+        }
+
+        private SubmitSm createSubmitSm(boolean isUnicode, boolean isMultipart, boolean isFlash , boolean sendPayloadInTLV,  byte[] payload) throws Exception {
+            SubmitSm submitSm = new SubmitSm();
+            submitSm.setSourceAddress(new Address((byte)0x01, (byte)0x01, "CANBNK"));
+            submitSm.setDestAddress(new Address((byte)0x01, (byte)0x01, "917550232158"));
+            submitSm.setRegisteredDelivery(SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
+//            submitSm.setDataCoding(isUnicode ? (byte) 0x08 : (byte) 0x00);
+
+            byte dataCoding;
+            if (isUnicode) {
+                dataCoding = isFlash ? (byte) 0x18 : (byte) 0x08;
+            } else {
+                dataCoding = isFlash ? (byte) 0x10 : (byte) 0x00;
+            }
+            submitSm.setDataCoding(dataCoding);
+
+            if (isMultipart) {
+                submitSm.setEsmClass(SmppConstants.ESM_CLASS_UDHI_MASK);
+            }
+            if(sendPayloadInTLV)
+            {
+                submitSm.addOptionalParameter(new Tlv(SmppConstants.TAG_MESSAGE_PAYLOAD, payload));
+
+            }else {
+                submitSm.setShortMessage(payload);
+            }
             // Add DLT specific Custom TLVs required by SMSC Core V2 validation
             submitSm.addOptionalParameter(new Tlv((short) 0x1400, "110100001403".getBytes())); // PE_ID
-            submitSm.addOptionalParameter(new Tlv((short) 0x1401, "1107174074670190034".getBytes())); // TEMPLATE_ID
+            submitSm.addOptionalParameter(new Tlv((short) 0x1401, "1007161192273631931  ".getBytes())); // TEMPLATE_ID
             return submitSm;
         }
 

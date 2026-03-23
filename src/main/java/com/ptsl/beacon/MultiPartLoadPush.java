@@ -268,7 +268,7 @@ public class MultiPartLoadPush {
         }
 
         sm.addOptionalParameter(new Tlv((short) 0x1400, "110100001403".getBytes()));
-        sm.addOptionalParameter(new Tlv((short) 0x1401, "1107174074670190034".getBytes()));
+        sm.addOptionalParameter(new Tlv((short) 0x1401, "1107174074670670034".getBytes()));
 
         return sm;
     }
