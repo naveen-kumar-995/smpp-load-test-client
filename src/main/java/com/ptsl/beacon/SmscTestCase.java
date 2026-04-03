@@ -16,10 +16,11 @@ import com.sun.jdi.event.ThreadDeathEvent;
 
 public class SmscTestCase {
 
-    private static final int    NUMBER_OF_SESSIONS = 7;
-    private static final String SMSC_HOST          = "172.25.4.191";
-    private static final int    SMSC_PORT          = 2775;
-    private static final String SYSTEM_ID          = "naveen_test_01";
+    private static final int    NUMBER_OF_SESSIONS = 1;
+    private static final String SMSC_HOST          = "qasmsc.pinlab.in";
+    private static final int    SMSC_PORT          = 2777;
+//    private static final String SYSTEM_ID          = "naveen_test_01";
+    private static final String SYSTEM_ID          = "sandip_test_01";
     private static final String PASSWORD           = "pass123";
 
     private static final AtomicInteger REF_COUNTER = new AtomicInteger(1);
@@ -122,9 +123,9 @@ public class SmscTestCase {
 
             List<TestCase> tests = List.of(
                     // plain Single message
-//                    new TestCase(false,false,false,false,
-//                            "1007161192273631931",
-//                            "Thanks for showing interest on CANARA BUDGET LOAN of Canara Bank. Your Regenerated MPIN is {#var#}.Pls enter the same to continue the online application."),
+                    new TestCase(false,false,false,false,
+                            "1007161192273631931",
+                            "Thanks for showing interest on CANARA BUDGET LOAN of Canara Bank. Your Regenerated MPIN is {#var#}.Pls enter the same to continue the online application."),
 
                     // plain Single flash message
 //                    new TestCase(false,false,true,false,
@@ -143,9 +144,9 @@ public class SmscTestCase {
 
 //
                     // multi  Plain message
-                    new TestCase(false, true,false , false,
-                            "1007161200664272263",
-                            "An amount of {#var#} has been debited to {#var#} on {#var#} towards {#var#} fvg Benf {#var#}, IFSC {#var#}, Benf A/c {#var#}, UTR {#var#}. Total Avail. Bal INR {#var#} -Canara Bank"),
+//                    new TestCase(false, true,false , false,
+//                            "1007161200664272263",
+//                            "An amount of {#var#} has been debited to {#var#} on {#var#} towards {#var#} fvg Benf {#var#}, IFSC {#var#}, Benf A/c {#var#}, UTR {#var#}. Total Avail. Bal INR {#var#} -Canara Bank"),
 
 //                    // Unicode Multi part  msg
 //                    new TestCase(true, true, true, false,

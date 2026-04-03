@@ -17,6 +17,7 @@ public class TelecomGradeSmppLoad {
 
     private static final Logger log = LoggerFactory.getLogger(MultiPartLoadPush.class);
 
+    private static AtomicLong dlrReceived = new AtomicLong();
     private static final int SESSIONS =
             getIntEnv("SESSIONS", 10);
 
@@ -211,11 +212,12 @@ public class TelecomGradeSmppLoad {
             long tps = sentDelta / 5;
 
             log.error(
-                    "TPS={} sent={} success={} failed={} queue={} totalSent={}",
+                    "TPS={} sent={} success={} failed={} dlr={} queue={} totalSent={}",
                     tps,
                     sentDelta,
                     successDelta,
                     failedDelta,
+                    dlrReceived.get(),
                     queue.size(),
                     currentSent
                      );
@@ -252,6 +254,19 @@ public class TelecomGradeSmppLoad {
 
     static class Handler extends DefaultSmppSessionHandler implements com.ptsl.beacon.Handler {
 
+        @Override
+        public PduResponse firePduRequestReceived(PduRequest request) {
+
+            if (request instanceof DeliverSm) {
+                dlrReceived.incrementAndGet();
+
+                DeliverSm deliverSm = (DeliverSm) request;
+
+                log.debug("DLR received: {}", new String(deliverSm.getShortMessage()));
+            }
+
+            return request.createResponse();
+        }
         @Override
         public void fireExpectedPduResponseReceived(
                 PduRequest req,
