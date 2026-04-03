@@ -392,7 +392,7 @@ public class MultiPartLoadPush {
             long delta = current - lastSent.getAndSet(current);
 
             log.error(
-                    "TPS={} sentDelta={} produced={} sentTotal={} success={} failed={} queue={} singleMsg={} multipartMsg={}",
+                    "TPS={} sentDelta={} produced={} sentTotal={} success={} failed={} queue={} singleMsg={} multipartMsg={} dlrReceivedTotal={}",
                     delta / 5,
                     delta,
                     produced.get(),
@@ -401,7 +401,8 @@ public class MultiPartLoadPush {
                     failed.get(),
                     queue.size(),
                     generatedSingleMessages.get(),
-                    generatedMultipartMessages.get()
+                    generatedMultipartMessages.get(),
+                    dlrReceived.get()
                      );
         }, 5, 5, TimeUnit.SECONDS);
     }
