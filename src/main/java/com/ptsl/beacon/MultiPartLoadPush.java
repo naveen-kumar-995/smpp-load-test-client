@@ -4,6 +4,9 @@ import com.cloudhopper.commons.charset.CharsetUtil;
 import com.cloudhopper.smpp.*;
 import com.cloudhopper.smpp.impl.DefaultSmppClient;
 import com.cloudhopper.smpp.impl.DefaultSmppSessionHandler;
+import com.cloudhopper.smpp.pdu.DeliverSm;
+import com.cloudhopper.smpp.pdu.PduRequest;
+import com.cloudhopper.smpp.pdu.PduResponse;
 import com.cloudhopper.smpp.pdu.SubmitSm;
 import com.cloudhopper.smpp.pdu.SubmitSmResp;
 import com.cloudhopper.smpp.tlv.Tlv;
@@ -74,6 +77,8 @@ public class MultiPartLoadPush {
 
     private static final AtomicLong generatedSingleMessages = new AtomicLong();
     private static final AtomicLong generatedMultipartMessages = new AtomicLong();
+
+    private static AtomicLong dlrReceived = new AtomicLong();
 
     private static SmppSession[] sessions;
 
@@ -433,6 +438,19 @@ public class MultiPartLoadPush {
         @Override
         public void fireChannelUnexpectedlyClosed() {
             log.error("SMPP session closed unexpectedly");
+        }
+        @Override
+        public PduResponse firePduRequestReceived(PduRequest request) {
+
+            if (request instanceof DeliverSm) {
+                dlrReceived.incrementAndGet();
+
+                DeliverSm deliverSm = (DeliverSm) request;
+
+                log.debug("DLR received: {}", new String(deliverSm.getShortMessage()));
+            }
+
+            return request.createResponse();
         }
     }
 
