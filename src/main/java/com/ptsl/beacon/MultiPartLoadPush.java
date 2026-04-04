@@ -5,6 +5,7 @@ import com.cloudhopper.smpp.*;
 import com.cloudhopper.smpp.impl.DefaultSmppClient;
 import com.cloudhopper.smpp.impl.DefaultSmppSessionHandler;
 import com.cloudhopper.smpp.pdu.DeliverSm;
+import com.cloudhopper.smpp.pdu.EnquireLink;
 import com.cloudhopper.smpp.pdu.PduRequest;
 import com.cloudhopper.smpp.pdu.PduResponse;
 import com.cloudhopper.smpp.pdu.SubmitSm;
@@ -124,6 +125,8 @@ public class MultiPartLoadPush {
         startGenerator();
         startSenders();
         startMetrics();
+        startEnquireLinkThread();
+        addShutdownHook();
     }
 
     private static void printConfig() {
@@ -405,6 +408,45 @@ public class MultiPartLoadPush {
                     dlrReceived.get()
                      );
         }, 5, 5, TimeUnit.SECONDS);
+    }
+
+    static void startEnquireLinkThread() {
+        ScheduledExecutorService enquireExecutor = Executors.newScheduledThreadPool(1);
+
+        enquireExecutor.scheduleAtFixedRate(() -> {
+            for (int i = 0; i < sessions.length; i++) {
+                try {
+                    SmppSession session = sessions[i];
+                    if (session != null && session.isBound()) {
+                        session.enquireLink(new EnquireLink(), 5000);
+                        log.debug("EnquireLink sent for session {}", i);
+                    }
+                } catch (Exception e) {
+                    log.error("EnquireLink failed", e);
+                }
+            }
+        }, 30, 30, TimeUnit.SECONDS);
+    }
+    static void addShutdownHook() {
+        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+            log.error("Shutdown initiated. Unbinding SMPP sessions...");
+
+            if (sessions != null) {
+                for (int i = 0; i < sessions.length; i++) {
+                    try {
+                        if (sessions[i] != null && sessions[i].isBound()) {
+                            sessions[i].unbind(5000);
+                            sessions[i].close();
+                            log.error("Session {} unbound", i);
+                        }
+                    } catch (Exception e) {
+                        log.error("Error unbinding session {}", i, e);
+                    }
+                }
+            }
+
+            log.error("All sessions unbound. Shutdown complete.");
+        }));
     }
 
     // --------------------------------------------------------
