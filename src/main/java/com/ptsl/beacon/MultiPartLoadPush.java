@@ -32,6 +32,7 @@ public class MultiPartLoadPush {
     private static final int SESSIONS = getIntEnv("SESSIONS", 5);
     private static final int WINDOW = getIntEnv("WINDOW_SIZE", 1000);
     private static final int WORKERS = getIntEnv("WORKER_THREADS", 50);
+    private static final SmppBindType smppBindType = getSmppBindType();
     private static final int QUEUE_SIZE = getIntEnv("QUEUE_SIZE", 100000);
 
     private static final String HOST = getEnv("SMSC_HOST", "127.0.0.1");
@@ -110,7 +111,7 @@ public class MultiPartLoadPush {
         for (int i = 0; i < SESSIONS; i++) {
             SmppSessionConfiguration cfg = new SmppSessionConfiguration();
             cfg.setName("session-" + i);
-            cfg.setType(SmppBindType.TRANSCEIVER);
+            cfg.setType(smppBindType);
             cfg.setHost(HOST);
             cfg.setPort(PORT);
             cfg.setSystemId(SYSTEM_ID);
@@ -526,6 +527,23 @@ public class MultiPartLoadPush {
         } catch (Exception e) {
             return def;
         }
+    }
+
+    private static SmppBindType getSmppBindType()
+    {
+
+       String bindType =  getEnv("SMPP_BIND_TYPE", "TRX");
+
+       if(bindType != null)
+       {
+           if("TX".equalsIgnoreCase(bindType))
+           {
+              return SmppBindType.TRANSMITTER;
+           } else if ("RX".equalsIgnoreCase(bindType)) {
+               return SmppBindType.RECEIVER;
+           }
+       }
+        return SmppBindType.TRANSCEIVER;
     }
 
     private static long getLongEnv(String key, long def) {

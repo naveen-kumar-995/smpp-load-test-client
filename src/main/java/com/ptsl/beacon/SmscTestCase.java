@@ -17,10 +17,10 @@ import com.sun.jdi.event.ThreadDeathEvent;
 public class SmscTestCase {
 
     private static final int    NUMBER_OF_SESSIONS = 1;
-    private static final String SMSC_HOST          = "qasmsc.pinlab.in";
-    private static final int    SMSC_PORT          = 2777;
-//    private static final String SYSTEM_ID          = "naveen_test_01";
-    private static final String SYSTEM_ID          = "sandip_test_01";
+    private static final String SMSC_HOST          = "172.25.4.191";
+    private static final int    SMSC_PORT          = 2775;
+    private static final String SYSTEM_ID          = "naveen_test_01";
+//    private static final String SYSTEM_ID          = "sandip_test_01";
     private static final String PASSWORD           = "pass123";
 
     private static final AtomicInteger REF_COUNTER = new AtomicInteger(1);
@@ -132,7 +132,7 @@ public class SmscTestCase {
 //                    "1007161192273631931",
 //                    "Thanks for showing interest on CANARA BUDGET LOAN of Canara Bank. Your Regenerated MPIN is {#var#}.Pls enter the same to continue the online application."),
 
-                    // Unicode Single part
+//                     Unicode Single part
 //                    new TestCase(true,false,false,false,
 //                    "1107162868531893168",
 //                    "जन्मदिन की हार्दिक शुभकामनाएं केनरा बैंक Happy Birthday Canara Bank"),
@@ -149,10 +149,10 @@ public class SmscTestCase {
 //                            "An amount of {#var#} has been debited to {#var#} on {#var#} towards {#var#} fvg Benf {#var#}, IFSC {#var#}, Benf A/c {#var#}, UTR {#var#}. Total Avail. Bal INR {#var#} -Canara Bank"),
 
 //                    // Unicode Multi part  msg
-//                    new TestCase(true, true, true, false,
+//                    new TestCase(true, true, false, false,
 //                            "1107174074670190034",
 //                            "மார்ச் 4 2025 வருகின்ற செவ்வாய் கிழமை அன்று ங்கரன்கோவில் நீதிமன்ற கட்டிட வளாகத்தில் நடைபெறவுள்ள லோக் அதாலத் தற்போது உள்ளூர் விடுமுறை காரணத்தினால் 03.03.2025 திங்கள் கிழமை அன்று மாற்றப்பட்டுள்ளது என்பதை தெரிவித்துக் கொள்கிறோம். கனரா வங்கி மண்டல அலுவலகம் தூத்துக்குடி"),
-//
+
 
                     new TestCase(false, false, false, false, null, null)
 
