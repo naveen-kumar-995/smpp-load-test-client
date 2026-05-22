@@ -189,6 +189,7 @@ public class SmscTestCase {
                         "CANBNK",
                         "917550232158",
                         "110100001403",
+                        "c8d0732a6d04541dece6523e271b2bc4e9ae7af4fd5af678281e6e123c6dcf14",
                         templateId,
                         bytes);
 
@@ -235,6 +236,7 @@ public class SmscTestCase {
                         "CANBNK",
                         "917550232158",
                         "110100001403",
+                        "c8d0732a6d04541dece6523e271b2bc4e9ae7af4fd5af678281e6e123c6dcf14",
                         templateId,
                         buf.array());
 
@@ -248,7 +250,7 @@ public class SmscTestCase {
 
         private SubmitSm createDynamicSubmitSm(boolean isUnicode, boolean isMultipart, boolean isFlash,
                                                boolean sendPayloadInTLV, String header, String dest,
-                                               String peId, String templateId, byte[] payload) throws Exception {
+                                               String peId, String telemarketerId, String templateId, byte[] payload) throws Exception {
 
             SubmitSm submitSm = new SubmitSm();
             submitSm.setSourceAddress(new Address((byte) 1, (byte) 1, header));
@@ -271,6 +273,7 @@ public class SmscTestCase {
 
             submitSm.addOptionalParameter(new Tlv((short) 0x1400, peId.getBytes()));
             submitSm.addOptionalParameter(new Tlv((short) 0x1401, templateId.getBytes()));
+            submitSm.addOptionalParameter(new Tlv((short) 0x1402, telemarketerId.getBytes()));
 
             return submitSm;
         }
@@ -304,10 +307,6 @@ public class SmscTestCase {
         }
     }
 
-    // ============================================================
-    // TEST CASE MODEL
-    // ============================================================
-
     static class TestCase {
         boolean unicode;
         boolean multipart;
@@ -325,15 +324,6 @@ public class SmscTestCase {
             this.message = message;
         }
     }
-
-    private void sendEnquireLink(SmppSession session) throws Exception {
-
-
-        EnquireLink ping = new EnquireLink();
-        session.enquireLink(ping, 10000);
-        System.out.println("EnquireLink (Ping) successful!");
-    }
-
 
     private static class ClientSessionHandler extends DefaultSmppSessionHandler {
         @Override
