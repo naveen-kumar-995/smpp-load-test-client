@@ -17,11 +17,12 @@ import com.sun.jdi.event.ThreadDeathEvent;
 public class SmscTestCase {
 
     private static final int    NUMBER_OF_SESSIONS = 1;
-    private static final String SMSC_HOST          = "172.25.4.191";
-    private static final int    SMSC_PORT          = 2775;
-    private static final String SYSTEM_ID          = "naveen_test_01";
+    private static final String SMSC_HOST          = "10.10.2.14";
+    private static final int    SMSC_PORT          = 4775;
+//    private static final String SYSTEM_ID          = "asmppload4";
+    private static final String SYSTEM_ID          = "live_01";
 //    private static final String SYSTEM_ID          = "sandip_test_01";
-    private static final String PASSWORD           = "pass123";
+    private static final String PASSWORD           = "pass@123";
 
     private static final AtomicInteger REF_COUNTER = new AtomicInteger(1);
 
@@ -123,9 +124,9 @@ public class SmscTestCase {
 
             List<TestCase> tests = List.of(
                     // plain Single message
-                    new TestCase(false,false,false,false,
-                            "1007161192273631931",
-                            "Thanks for showing interest on CANARA BUDGET LOAN of Canara Bank. Your Regenerated MPIN is {#var#}.Pls enter the same to continue the online application."),
+//                    new TestCase(false,false,false,false,
+//                            "1007161192273631931",
+//                            "Thanks for showing interest on CANARA BUDGET LOAN of Canara Bank. Your Regenerated MPIN is {#var#}.Pls enter the same to continue the online application."),
 
                     // plain Single flash message
 //                    new TestCase(false,false,true,false,
@@ -133,14 +134,14 @@ public class SmscTestCase {
 //                    "Thanks for showing interest on CANARA BUDGET LOAN of Canara Bank. Your Regenerated MPIN is {#var#}.Pls enter the same to continue the online application."),
 
 //                     Unicode Single part
-//                    new TestCase(true,false,false,false,
+//                    new TestCase(true,false,true,false,
 //                    "1107162868531893168",
 //                    "जन्मदिन की हार्दिक शुभकामनाएं केनरा बैंक Happy Birthday Canara Bank"),
 
 //                     Unicode Single part flash msg
-//                    new TestCase(true,false,true,false,
-//                    "1107162868531893168",
-//                    "जन्मदिन की हार्दिक शुभकामनाएं केनरा बैंक Happy Birthday Canara Bank"),
+                    new TestCase(true,false,true,false,
+                    "1107162868531893168",
+                    "जन्मदिन की हार्दिक शुभकामनाएं केनरा बैंक Happy Birthday Canara Bank"),
 
 //
                     // multi  Plain message
@@ -149,7 +150,7 @@ public class SmscTestCase {
 //                            "An amount of {#var#} has been debited to {#var#} on {#var#} towards {#var#} fvg Benf {#var#}, IFSC {#var#}, Benf A/c {#var#}, UTR {#var#}. Total Avail. Bal INR {#var#} -Canara Bank"),
 
 //                    // Unicode Multi part  msg
-//                    new TestCase(true, true, false, false,
+//                    new TestCase(true, true, true, true,
 //                            "1107174074670190034",
 //                            "மார்ச் 4 2025 வருகின்ற செவ்வாய் கிழமை அன்று ங்கரன்கோவில் நீதிமன்ற கட்டிட வளாகத்தில் நடைபெறவுள்ள லோக் அதாலத் தற்போது உள்ளூர் விடுமுறை காரணத்தினால் 03.03.2025 திங்கள் கிழமை அன்று மாற்றப்பட்டுள்ளது என்பதை தெரிவித்துக் கொள்கிறோம். கனரா வங்கி மண்டல அலுவலகம் தூத்துக்குடி"),
 
@@ -180,12 +181,16 @@ public class SmscTestCase {
 
             String templateId = test.templateId;
 
-            if (! test.multipart) {
+            if (!test.multipart || test.tlvPayload) {
+
                 SubmitSm sm = createDynamicSubmitSm(
                         test.unicode,
-                        false,
+                        false, // NOT multipart
                         test.flash,
                         test.tlvPayload,
+                        0,
+                        0,
+                        0,
                         "CANBNK",
                         "917550232158",
                         "110100001403",
@@ -210,7 +215,13 @@ public class SmscTestCase {
                     test.message,
                     test.unicode ? CharsetUtil.CHARSET_UCS_2 : CharsetUtil.CHARSET_GSM);
 
-            int chunk = test.unicode ? 134 : 153;
+//            int chunk = test.unicode ? 134 : 153;
+            int chunk;
+            if (test.tlvPayload) {
+                chunk = test.unicode ? 140 : 160;
+            } else {
+                chunk = test.unicode ? 134 : 153;
+            }
             int totalParts = (int) Math.ceil((double) fullBytes.length / chunk);
             int ref = REF_COUNTER.incrementAndGet() & 0xff;
 
@@ -222,23 +233,41 @@ public class SmscTestCase {
                 byte[] body = new byte[len];
                 System.arraycopy(fullBytes, start, body, 0, len);
 
-                byte[] udh = buildUdh(ref, totalParts, part);
+//                byte[] udh = buildUdh(ref, totalParts, part);
+//
+//                ByteBuffer buf = ByteBuffer.allocate(udh.length + body.length);
+//                buf.put(udh);
+//                buf.put(body);
 
-                ByteBuffer buf = ByteBuffer.allocate(udh.length + body.length);
-                buf.put(udh);
-                buf.put(body);
+                byte[] payload;
 
+                if (test.tlvPayload) {
+                    payload = body; // NO UDH
+                } else {
+                    byte[] udh = buildUdh(ref, totalParts, part);
+
+                    ByteBuffer buf =
+                            ByteBuffer.allocate(udh.length + body.length);
+
+                    buf.put(udh);
+                    buf.put(body);
+
+                    payload = buf.array();
+                }
                 SubmitSm sm = createDynamicSubmitSm(
                         test.unicode,
                         true,
                         test.flash,
                         test.tlvPayload,
+                        ref,
+                        totalParts,
+                        part,
                         "CANBNK",
                         "917550232158",
                         "110100001403",
                         "c8d0732a6d04541dece6523e271b2bc4e9ae7af4fd5af678281e6e123c6dcf14",
                         templateId,
-                        buf.array());
+                        payload);
 
                 submitAndWait(session, sm, test);
             }
@@ -248,35 +277,98 @@ public class SmscTestCase {
         // SUBMIT BUILDER
         // ============================================================
 
-        private SubmitSm createDynamicSubmitSm(boolean isUnicode, boolean isMultipart, boolean isFlash,
-                                               boolean sendPayloadInTLV, String header, String dest,
-                                               String peId, String telemarketerId, String templateId, byte[] payload) throws Exception {
+        private SubmitSm createDynamicSubmitSm(boolean isUnicode, boolean isMultipart, boolean isFlash, boolean sendPayloadInTLV, int refNum, int totalParts, int partNum, String header, String dest, String peId, String telemarketerId, String templateId, byte[] payload) throws Exception {
 
             SubmitSm submitSm = new SubmitSm();
-            submitSm.setSourceAddress(new Address((byte) 1, (byte) 1, header));
-            submitSm.setDestAddress(new Address((byte) 1, (byte) 1, dest));
-            submitSm.setRegisteredDelivery(SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
 
+            /*
+             * SOURCE ADDRESS
+             *
+             * TON=5 NPI=0 for alphanumeric sender IDs like CANBNK
+             */
+            submitSm.setSourceAddress(new Address(SmppConstants.TON_ALPHANUMERIC, SmppConstants.NPI_UNKNOWN, header));
+
+            /*
+             * DESTINATION ADDRESS
+             */
+            submitSm.setDestAddress(new Address(SmppConstants.TON_INTERNATIONAL, SmppConstants.NPI_E164, dest));
+            /*
+             * DLR REQUEST
+             */
+            submitSm.setRegisteredDelivery(SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
+            /*
+             * DATA CODING
+             */
             byte dcs = isUnicode ? (byte) 0x08 : (byte) 0x00;
+
             if (isFlash) {
                 dcs = isUnicode ? (byte) 0x18 : (byte) 0x10;
             }
             submitSm.setDataCoding(dcs);
-
-            if (isMultipart)
+            /*
+             * ESM CLASS
+             *
+             * ONLY set UDHI when actual UDH exists.
+             * DO NOT set UDHI for TLV payload mode.
+             */
+            if (isMultipart && ! sendPayloadInTLV) {
                 submitSm.setEsmClass(SmppConstants.ESM_CLASS_UDHI_MASK);
+            }
+            /*
+             * PAYLOAD
+             */
+            if (sendPayloadInTLV) {
 
-            if (sendPayloadInTLV)
+                /*
+                 * message_payload TLV
+                 */
                 submitSm.addOptionalParameter(new Tlv(SmppConstants.TAG_MESSAGE_PAYLOAD, payload));
-            else
+            } else {
+                /*
+                 * Standard short_message flow
+                 * (single or UDH multipart)
+                 */
                 submitSm.setShortMessage(payload);
-
+            }
+            /*
+             * CUSTOM TLVs
+             */
             submitSm.addOptionalParameter(new Tlv((short) 0x1400, peId.getBytes()));
             submitSm.addOptionalParameter(new Tlv((short) 0x1401, templateId.getBytes()));
             submitSm.addOptionalParameter(new Tlv((short) 0x1402, telemarketerId.getBytes()));
 
             return submitSm;
         }
+
+//        private SubmitSm createDynamicSubmitSm(boolean isUnicode, boolean isMultipart, boolean isFlash,
+//                                               boolean sendPayloadInTLV, String header, String dest,
+//                                               String peId, String telemarketerId, String templateId, byte[] payload) throws Exception {
+//
+//            SubmitSm submitSm = new SubmitSm();
+//            submitSm.setSourceAddress(new Address((byte) 1, (byte) 1, header));
+//            submitSm.setDestAddress(new Address((byte) 1, (byte) 1, dest));
+//            submitSm.setRegisteredDelivery(SmppConstants.REGISTERED_DELIVERY_SMSC_RECEIPT_REQUESTED);
+//
+//            byte dcs = isUnicode ? (byte) 0x08 : (byte) 0x00;
+//            if (isFlash) {
+//                dcs = isUnicode ? (byte) 0x18 : (byte) 0x10;
+//            }
+//            submitSm.setDataCoding(dcs);
+//
+//            if (isMultipart)
+//                submitSm.setEsmClass(SmppConstants.ESM_CLASS_UDHI_MASK);
+//
+//            if (sendPayloadInTLV)
+//                submitSm.addOptionalParameter(new Tlv(SmppConstants.TAG_MESSAGE_PAYLOAD, payload));
+//            else
+//                submitSm.setShortMessage(payload);
+//
+//            submitSm.addOptionalParameter(new Tlv((short) 0x1400, peId.getBytes()));
+//            submitSm.addOptionalParameter(new Tlv((short) 0x1401, templateId.getBytes()));
+//            submitSm.addOptionalParameter(new Tlv((short) 0x1402, telemarketerId.getBytes()));
+//
+//            return submitSm;
+//        }
 
         private void submitAndWait(SmppSession session, SubmitSm submitSm, TestCase test) throws Exception {
             SubmitSmResp resp = session.submit(submitSm, 10000);
