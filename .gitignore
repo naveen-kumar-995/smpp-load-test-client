@@ -1,37 +1,44 @@
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.flattened-pom.xml
+classworlds.conf
 
-!.mvn/wrapper/maven-wrapper.jar
+# Log files
+*.log
+logs/
+/logs
 
-
-### IntelliJ IDEA ###
-.idea/modules.xml
-.idea/jarRepositories.xml
-.idea/compiler.xml
-.idea/libraries/
+# IntelliJ IDEA
+.idea/
 *.iws
 *.iml
 *.ipr
+out/
 
-### Eclipse ###
-.apt_generated
+# Eclipse
+.metadata
 .classpath
-.factorypath
 .project
-.settings
-.springBeans
-.sts4-cache
+.settings/
+bin/
+tmp/
+.apt_generated/
+.factorypath
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
+# NetBeans
+nbproject/private/
 build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+nbbuild/
+dist/
+nbdist/
+.nb-gradle/
 
-### VS Code ###
-.vscode/
-
-### Mac OS ###
+# OS-specific
 .DS_Store
+Thumbs.db
