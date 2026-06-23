@@ -66,6 +66,7 @@ public class AsyncMultiPartLoadPush {
         log.error("SinglePercent={}", config.singlePercent);
         log.error("Unicode={}", config.unicode);
         log.error("BindType={}", config.bindType);
+        log.error("TargetTPS={}", config.targetTps);
         log.error("============================================");
     }
 }

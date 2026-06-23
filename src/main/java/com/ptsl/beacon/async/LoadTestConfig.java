@@ -19,6 +19,7 @@ public class LoadTestConfig {
     public final String singleMessage;
     public final String multipartMessage;
     public final SmppBindType bindType;
+    public final int targetTps;
 
     public LoadTestConfig() {
         this.sessions = getIntEnv("SESSIONS", 5);
@@ -40,6 +41,7 @@ public class LoadTestConfig {
                         + "fvg Benf {#var#}, IFSC {#var#}, Benf A/c {#var#}, UTR {#var#}. "
                         + "Total Avail. Bal INR {#var#} -Canara Bank");
         this.bindType = parseBindType(getEnv("SMPP_BIND_TYPE", "TRX"));
+        this.targetTps = getIntEnv("TARGET_TPS", 0); // 0 means unlimited
     }
 
     private static String getEnv(String key, String def) {
