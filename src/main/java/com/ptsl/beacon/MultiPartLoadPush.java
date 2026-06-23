@@ -80,6 +80,10 @@ public class MultiPartLoadPush {
     private static final AtomicLong generatedSingleMessages = new AtomicLong();
     private static final AtomicLong generatedMultipartMessages = new AtomicLong();
 
+    private static final AtomicLong totalSubmitLatencyMs = new AtomicLong();
+    private static final AtomicLong submitCount = new AtomicLong();
+    private static final AtomicLong maxSubmitLatencyMs = new AtomicLong();
+
     private static AtomicLong dlrReceived = new AtomicLong();
 
     private static SmppSession[] sessions;
@@ -232,9 +236,19 @@ public class MultiPartLoadPush {
                             continue;
                         }
 
+                        long start = System.nanoTime();
                         SubmitSm sm = createSubmitSm(fragment);
                         SubmitSmResp resp = session.submit(sm, 10_000);
 
+                        long latencyMs =
+                                TimeUnit.NANOSECONDS.toMillis(
+                                        System.nanoTime() - start);
+                        totalSubmitLatencyMs.addAndGet(latencyMs);
+                        submitCount.incrementAndGet();
+
+                        maxSubmitLatencyMs.accumulateAndGet(
+                                latencyMs,
+                                Math::max);
                         sent.incrementAndGet();
 
                         if (resp.getCommandStatus() == SmppConstants.STATUS_OK) {
@@ -392,11 +406,21 @@ public class MultiPartLoadPush {
         AtomicLong lastSent = new AtomicLong();
 
         metrics.scheduleAtFixedRate(() -> {
+
             long current = sent.get();
             long delta = current - lastSent.getAndSet(current);
 
+            long totalCount = submitCount.get();
+
+            long avgLatency =
+                    totalCount == 0
+                            ? 0
+                            : totalSubmitLatencyMs.get() / totalCount;
+
+            long maxLatency = maxSubmitLatencyMs.get();
+
             log.error(
-                    "TPS={} sentDelta={} produced={} sentTotal={} success={} failed={} queue={} singleMsg={} multipartMsg={} dlrReceivedTotal={}",
+                    "TPS={} sentDelta={} produced={} sentTotal={} success={} failed={} queue={} singleMsg={} multipartMsg={} dlrReceivedTotal={} avgSubmitLatencyMs={} maxSubmitLatencyMs={}",
                     delta / 5,
                     delta,
                     produced.get(),
@@ -406,8 +430,43 @@ public class MultiPartLoadPush {
                     queue.size(),
                     generatedSingleMessages.get(),
                     generatedMultipartMessages.get(),
-                    dlrReceived.get()
+                    dlrReceived.get(),
+                    avgLatency,
+                    maxLatency
                      );
+
+            // Window diagnostics
+            for (int i = 0; i < sessions.length; i++) {
+
+                try {
+
+                    SmppSession session = sessions[i];
+
+                    if (session == null || !session.isBound()) {
+
+                        log.error(
+                                "Session={} state=DOWN",
+                                i);
+
+                        continue;
+                    }
+
+                    log.error(
+                            "Session={} pending={} free={} window={}",
+                            i,
+                            session.getSendWindow().getSize(),
+                            session.getSendWindow().getFreeSize(),
+                            WINDOW);
+
+                } catch (Exception e) {
+
+                    log.error(
+                            "Failed to fetch window stats for session={}",
+                            i,
+                            e);
+                }
+            }
+
         }, 5, 5, TimeUnit.SECONDS);
     }
 
