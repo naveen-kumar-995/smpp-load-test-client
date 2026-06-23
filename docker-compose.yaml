@@ -29,6 +29,7 @@ services:
       WORKER_THREADS: "50"
       QUEUE_SIZE: "500000"
       MAX_MESSAGES: "10000000"
+      TARGET_TPS: "5000"
 
       dlr_url: "http://172.25.4.191:8080/dlr"
       dlr_concurrency: "180"

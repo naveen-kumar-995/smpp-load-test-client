@@ -33,7 +33,32 @@ public class MessageGenerator {
 
     public void start() {
         generatorThread = new Thread(() -> {
+            long targetTps = config.targetTps;
+            long secondStart = System.currentTimeMillis();
+            long producedInSecond = 0;
+
             while (metricsTracker.produced.get() < config.maxMessages) {
+                // Rate Limiting Throttler
+                if (targetTps > 0) {
+                    long now = System.currentTimeMillis();
+                    if (now - secondStart >= 1000) {
+                        secondStart = now;
+                        producedInSecond = 0;
+                    } else if (producedInSecond >= targetTps) {
+                        long sleepTime = 1000 - (now - secondStart);
+                        if (sleepTime > 0) {
+                            try {
+                                Thread.sleep(sleepTime);
+                            } catch (InterruptedException e) {
+                                Thread.currentThread().interrupt();
+                                return;
+                            }
+                        }
+                        secondStart = System.currentTimeMillis();
+                        producedInSecond = 0;
+                    }
+                }
+
                 Address src = randomSource();
                 Address dst = randomDestination();
 
@@ -45,6 +70,8 @@ public class MessageGenerator {
                     if (next > config.maxMessages) {
                         return;
                     }
+
+                    producedInSecond++;
 
                     try {
                         queue.put(fragment);
