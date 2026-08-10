@@ -42,7 +42,21 @@ public class SmppSessionManager {
     }
 
     public SmppSession getSession(int index) {
-        return sessions.get(index);
+        SmppSession session = sessions.get(index);
+
+            if (session == null) {
+                return  null;
+            }
+
+            if (!session.isBound()) {
+                return null;
+            }
+
+            if (session.getSendWindow().getFreeSize() <= 0) {
+                return null;
+            }
+            return session;
+
     }
 
     public int getLiveSessionCount() {

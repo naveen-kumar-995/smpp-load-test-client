@@ -17,12 +17,12 @@ import com.sun.jdi.event.ThreadDeathEvent;
 public class SmscTestCase {
 
     private static final int    NUMBER_OF_SESSIONS = 1;
-    private static final String SMSC_HOST          = "10.10.2.14";
+    private static final String SMSC_HOST          = "172.25.4.192";
     private static final int    SMSC_PORT          = 4775;
 //    private static final String SYSTEM_ID          = "asmppload4";
-    private static final String SYSTEM_ID          = "live_01";
+    private static final String SYSTEM_ID          = "load_test_01";
 //    private static final String SYSTEM_ID          = "sandip_test_01";
-    private static final String PASSWORD           = "pass@123";
+    private static final String PASSWORD           = "load@123";
 
     private static final AtomicInteger REF_COUNTER = new AtomicInteger(1);
 
